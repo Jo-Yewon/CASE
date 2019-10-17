@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.widget.TextView
 import kotlinx.android.synthetic.main.fragment_emergency_dialog.*
 
 class EmergencyDialogFragment : DialogFragment() {
@@ -20,9 +21,11 @@ class EmergencyDialogFragment : DialogFragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view = inflater.inflate(R.layout.fragment_emergency_dialog, container, false)
-        dialog.window?.apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            requestFeature(Window.FEATURE_NO_TITLE)
+        view?.let {
+            dialog.window?.let {
+                it.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                it.requestFeature(Window.FEATURE_NO_TITLE)
+            }
         }
         return view
     }
@@ -30,9 +33,9 @@ class EmergencyDialogFragment : DialogFragment() {
     override fun onResume() {
         super.onResume()
         dialog_textview.text = message
-        button.setOnClickListener { dismiss() }
-        button2.setOnClickListener {
-            val intent = Intent(context, FindAEDActivity::class.java)
+        view?.findViewById<TextView>(R.id.button)?.setOnClickListener { dismiss() }
+        view?.findViewById<TextView>(R.id.button2)?.setOnClickListener {
+            val intent = Intent(context, SOSActivity::class.java)
             startActivity(intent)
             dismiss()
         }

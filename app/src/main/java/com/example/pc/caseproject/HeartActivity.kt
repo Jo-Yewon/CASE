@@ -15,65 +15,56 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AppCompatActivity
-import android.support.v7.widget.Toolbar
 import android.telephony.SmsManager
-import android.view.View
 import android.widget.Toast
 import android.widget.Toast.LENGTH_LONG
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.Target
+import android.widget.Toolbar
 import kotlinx.android.synthetic.main.activity_heart.*
 
 
-class HeartActivity : AppCompatActivity(), CPRButton.PulseUpdateListener, AEDUtil.APIListener {
-
+class HeartActivity : AppCompatActivity(), CPRButton.PulseUpdateListener, AEDandSOScallUtil.APIListener {
     private lateinit var myRequest: AED_FIND_REQUEST
 
     private lateinit var mediaPlayer: MediaPlayer
     private lateinit var vibrator: Vibrator
 
-    private lateinit var receiver: MessageBroadcastReceiver
+    private lateinit var receiver:MessageBroadcastReceiver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_heart)
-        setSupportActionBar(toolbar as? Toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setDisplayShowHomeEnabled(true)
-        supportActionBar?.title = "Chest pressure"
+        setActionBar(toolbar as? Toolbar)
+        actionBar?.setDisplayHomeAsUpEnabled(true)
+        actionBar?.setDisplayShowHomeEnabled(true)
+        actionBar?.title = "흉부 압박"
         mediaPlayer = MediaPlayer.create(this, R.raw.beep)
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
         myRequest = AED_FIND_REQUEST()
         val myLocation = findMyLocation()
-        if (myLocation == null) {
-            Toast.makeText(applicationContext, "현재 위치를 받아올 수 없습니다. \n잠시후에 다시 시도하세요", Toast.LENGTH_LONG).show()
-            this.finish()
-        }
-        myRequest.myLatitude = myLocation?.latitude
-        myRequest.myLongitude = myLocation?.longitude
-        AEDUtil.getAEDData(this, myLocation!!, myRequest, this, true)
+        myRequest.setMyLatitude(myLocation?.latitude)
+        myRequest.setMyLongtitiude(myLocation?.longitude)
+        AEDandSOScallUtil.getAEDdataFromAPI(this, myLocation!!, myRequest, false, true, this)
 
         cprButton.pulseUpdateListener = this
         cprButton.isClickable = false
-        cprButton.background = resources.getDrawable(R.drawable.cpr_button_idle)
+        cprButton.background = resources.getDrawable(R.drawable.cpr_button_static)
+        pauseButton.setOnClickListener { cprButton.stop() }
         cprButton.start()
-        cprButton.setOnClickListener { cprButton.start() }
         text911()
-        Glide.with(this).load(R.drawable.intro).into(chestImage)
-        guide.text = "Place both hands\non the lower half of the chest."
     }
 
     override fun onResume() {
         super.onResume()
-        val intentFilter = IntentFilter()
+        val intentFilter=IntentFilter()
         intentFilter.addAction("accepted")
-        receiver = MessageBroadcastReceiver()
+        receiver=MessageBroadcastReceiver()
         registerReceiver(receiver, intentFilter)
     }
 
     override fun onPause() {
         super.onPause()
+        cprButton.stop()
         mediaPlayer.release()
         unregisterReceiver(receiver)
     }
@@ -84,37 +75,20 @@ class HeartActivity : AppCompatActivity(), CPRButton.PulseUpdateListener, AEDUti
     }
 
     override fun update() {
+        stepView.go(1, true)
+    }
+
+    override fun updateTime(seconds: Long) {
+        time.text = "압박 시간 ${(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}"
     }
 
     override fun updatePulse() {
-        guide.text = "Place both hands\non the lower half of the chest."
-        pulseView.apply {
-            alpha = 0f
-            visibility = View.VISIBLE
-            animate()
-                    .alpha(1f)
-                    .setDuration(100)
-                    .setListener(null)
-        }
         mediaPlayer.start()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
             vibrator.vibrate(300)
         }
-        pulseView.apply {
-            alpha = 1f
-            visibility = View.VISIBLE
-            animate()
-                    .alpha(0f)
-                    .setDuration(100)
-                    .setListener(null)
-        }
-    }
-
-    override fun pausePulse() {
-        cprButton.stop()
-        guide.text = "Stop compression and check."
     }
 
     private fun text911() {
@@ -123,25 +97,28 @@ class HeartActivity : AppCompatActivity(), CPRButton.PulseUpdateListener, AEDUti
         try {
             val smsManager = SmsManager.getDefault()
             smsManager.sendTextMessage(number, null, content, null, null)
+            stepView.go(0, true)
         } catch (e: Throwable) {
             Toast.makeText(this, "119 fail", LENGTH_LONG).show()
+            stepView.go(-1, true)
         }
     }
 
-    private fun findMyLocation(): Location? {
+    fun findMyLocation(): Location? {
         //**gps 기능이 켜졌는지 확인하는 코드가 필요합니다,
-        return if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             val myLocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            myLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            return myLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         } else {
             Toast.makeText(applicationContext, "먼저 위치 권한을 확인해주세요", Toast.LENGTH_LONG).show()
-            null
+            return null
         }
     }
 
-    inner class MessageBroadcastReceiver : BroadcastReceiver() {
+    inner class MessageBroadcastReceiver:BroadcastReceiver(){
         override fun onReceive(p0: Context?, p1: Intent?) {
-
+            stepView.go(2, true)
         }
+
     }
 }

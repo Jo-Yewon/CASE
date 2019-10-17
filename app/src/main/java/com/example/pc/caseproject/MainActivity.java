@@ -1,28 +1,18 @@
 package com.example.pc.caseproject;
 
 import android.Manifest;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Debug;
 import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.telephony.TelephonyManager;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -40,17 +30,21 @@ import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity {
     @BindView(R.id.cprButton)
-    Button cprButton;
+    CPRButton cprButton;
+    @BindView(R.id.aedButton)
+    Button aedButton;
     @BindView(R.id.toolbar)
     Toolbar toolbar;
     private ArrayList<Integer> missingPermissions;
     private String[] permissions = {Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE, Manifest.permission.ANSWER_PHONE_CALLS};
+            Manifest.permission.SEND_SMS};
     EmergencyDialogFragment popup;
+    ShowcaseDialog showcase;
 
     @Override
     protected void onResume() {
         if (popup != null) popup.dismiss();
+        openTutorial();
         super.onResume();
     }
 
@@ -63,17 +57,34 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         Objects.requireNonNull(getSupportActionBar()).setDisplayShowTitleEnabled(false);
         requestAllPermissions();
-        phoneNumber();
+        openTutorial();
     }
 
     //주변 AED 찾기 버튼 누르면 실행될 메서드 입니다.
     @OnClick(R.id.cprButton)
     public void onCPRButtonClicked(View v) {
-        requestAllPermissions();
-        notificationinit();
-
         Intent intent = new Intent(this, HeartActivity.class);
         startActivity(intent);
+    }
+
+    @OnClick(R.id.aedButton)
+    public void onAEDButtonClicked(View v) {
+        Intent intent = new Intent(this, NearAEDActivity.class);
+        startActivity(intent);
+    }
+
+    public void openTutorial() {
+        SharedPreferences sharedPreferences = this.getSharedPreferences("sFile", MODE_PRIVATE);
+        boolean tutorial_opened = sharedPreferences.getBoolean("tutorial_flag", false);
+        if (!tutorial_opened) {
+            FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+            showcase = new ShowcaseDialog();
+            showcase.show(getSupportFragmentManager(), "showcase");
+            ft.commit();
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putBoolean("tutorial_flag", true);
+            editor.apply();
+        }
     }
 
     @Override
@@ -111,23 +122,6 @@ public class MainActivity extends AppCompatActivity {
                         missingPermissions.add(i);
                     }
                 }
-            }
-        }
-        switch (requestCode) {
-            case 11: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                } else {
-                }
-                return;
-            }
-            case 0: {
-                if ((grantResults.length > 0) && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    //TODO
-                }
-                break;
             }
         }
     }
@@ -213,44 +207,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             Toast.makeText(this, "현재 SOS 요청이 없습니다.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    public void phoneNumber(){
-        TelephonyManager tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        String pn;
-        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE)!=PackageManager.PERMISSION_GRANTED){
-            return;
-        }
-        pn = tm.getLine1Number();
-        if(pn.startsWith("+82")){
-            pn=pn.replace("+82","0");
-            AEDUtil.PHONE_NUM=pn;
-        }
-        Log.d("phone", pn);
-    }
-
-    public void notificationinit() {
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
-
-        Intent backStartIntent = new Intent(MainActivity.this, CallWaitService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            NotificationChannel notificationChannel = new NotificationChannel("channel1", "1번채널", NotificationManager.IMPORTANCE_DEFAULT);
-            notificationChannel.setDescription("1번채널입니다");
-            notificationChannel.enableLights(true);
-            notificationChannel.setLightColor(Color.GREEN);
-            notificationChannel.enableVibration(true);
-            notificationChannel.setVibrationPattern(new long[]{100, 200, 100, 200});
-            notificationChannel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
-            notificationManager.createNotificationChannel(notificationChannel);
-            startForegroundService(backStartIntent);
-
-        } else {
-            startService(backStartIntent);
         }
     }
 }
